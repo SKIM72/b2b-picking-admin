@@ -441,3 +441,17 @@ input[type="text"]:focus, input[type="number"]:focus {
     background-color: var(--border-color);
     color: var(--text-primary-color);
 }
+
+/* ▼▼▼ 새로고침, 채널/차수 변경 버튼 hover 스타일 추가 ▼▼▼ */
+
+/* 새로고침 버튼 hover 시 파란색으로 변경 */
+#refresh-button:hover {
+    background-color: #007aff; /* iOS 스타일의 파란색 */
+}
+
+/* 채널/차수 변경 버튼 hover 시 남색으로 변경 */
+#change-channel-button:hover {
+    background-color: #343a40; /* 어두운 남색 계열 */
+}
+
+/* ▲▲▲ 새로고침, 채널/차수 변경 버튼 hover 스타일 추가 ▲▲▲ */
