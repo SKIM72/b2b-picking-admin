@@ -26,7 +26,7 @@ if (loginForm) {
             messageEl.textContent = '로그인 실패: ' + error.message;
         } else if (data.user) {
             if (data.user.email === 'eowert72@gmail.com' || (data.user.user_metadata && data.user.user_metadata.is_admin === true)) {
-                 window.location.href = 'admin.html';
+                 window.location.href = 'index.html';
             } else {
                  window.location.href = 'index.html';
             }
