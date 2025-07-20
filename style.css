@@ -267,10 +267,19 @@ input[type="text"]:focus, input[type="number"]:focus {
     text-align: center;
     padding: 0.75rem 1.5rem;
 }
+
+/* ▼▼▼ [추가] 진척도 표시 영역 레이아웃 수정 ▼▼▼ */
+.progress-item {
+    display: flex;
+    flex-direction: column; /* 자식 요소들을 세로로 쌓음 */
+    align-items: center;   /* 가로축 중앙 정렬 */
+    gap: 0.25rem;          /* 라벨과 숫자 사이의 간격 */
+}
+/* ▲▲▲ [추가] 진척도 표시 영역 레이아웃 수정 ▲▲▲ */
+
 .progress-item span {
     font-size: 0.8rem;
     color: var(--text-secondary-color);
-    margin-bottom: 0.25rem;
 }
 .progress-item strong {
     font-size: 1.1rem;
