@@ -1,0 +1,313 @@
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
+:root {
+    --primary-color: #007bff;
+    --primary-hover-color: #0069d9;
+    --danger-color: #dc3545;
+    --danger-hover-color: #c82333;
+    --background-color: #f4f6f9;
+    --card-bg-color: #ffffff;
+    --text-primary-color: #212529;
+    --text-secondary-color: #6c757d;
+    --border-color: #dee2e6;
+}
+
+html, body {
+    height: 100vh;
+    margin: 0;
+    font-family: 'Noto Sans KR', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-primary-color);
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+header, nav {
+    flex-shrink: 0;
+}
+
+header {
+    background-color: #212529; 
+    color: #ffffff;
+    padding: 1rem 2rem;
+    position: relative;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+nav {
+    background-color: #343a40;
+    padding: 0.5rem 2rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+nav button {
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    background-color: transparent;
+    color: #adb5bd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+nav button:hover {
+    color: white;
+}
+
+nav button.active {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 700;
+}
+
+main {
+    flex-grow: 1;
+    padding: 1.5rem 2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.content-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100%;
+}
+
+.sticky-controls {
+    position: sticky;
+    top: 0;
+    background-color: var(--background-color);
+    z-index: 10;
+    padding-bottom: 1.5rem;
+}
+
+.sticky-controls .card:last-child {
+    margin-bottom: 0;
+}
+
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0; 
+}
+
+/* ▼▼▼ [추가] 새로고침/엑셀 버튼 그룹 스타일 ▼▼▼ */
+.page-header .actions-group {
+    display: flex;
+    gap: 0.5rem;
+}
+/* ▲▲▲ [추가] 새로고침/엑셀 버튼 그룹 스타일 ▲▲▲ */
+
+.page-header h2 {
+    margin: 0;
+    font-size: 1.75rem;
+}
+
+.control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.card {
+    background: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.card-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+input[type="text"], input[type="file"], input[type="number"], select {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+input[type="date"] {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.9rem;
+    font-family: 'Noto Sans KR', sans-serif;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    line-height: normal;
+}
+
+
+.btn-primary { background-color: var(--primary-color); }
+.btn-primary:hover { background-color: var(--primary-hover-color); }
+.btn-secondary { background-color: #6c757d; }
+.btn-secondary:hover { background-color: #5a6268; }
+.btn-danger { background-color: var(--danger-color); }
+.btn-danger:hover { background-color: var(--danger-hover-color); }
+
+.btn-icon-danger {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--danger-color);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btn-icon-danger:hover {
+    background-color: #fbebee;
+    border-color: #f5c6cb;
+}
+
+.btn-icon-danger .material-icons {
+    font-size: 1.25rem;
+}
+
+
+.card-body button,
+.actions-group button,
+header button {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+}
+
+.table-wrapper {
+    overflow: auto; 
+    border-radius: 8px;
+    background-color: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 1rem;
+    vertical-align: middle;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa;
+    z-index: 2; 
+}
+tbody tr:hover { background-color: #f1f3f5; }
+
+tbody tr.completed-row {
+    background-color: #e7f7f0;
+}
+tbody tr.completed-row:hover {
+    background-color: #d8f3e2;
+}
+
+#picking-status-table th,
+#batch-details-section table th,
+#products-section table th {
+    text-align: center;
+}
+
+#picking-status-table td,
+#batch-details-section table td,
+#products-section table td {
+    text-align: center;
+}
+
+
+.management-list { list-style-type: none; padding: 0; margin: 0; width: 100%; }
+.management-list-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid var(--border-color); }
+.management-list-item:last-child { border-bottom: none; }
+.user-status { padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 700; }
+.status-approved { background-color: #e7f7f0; color: #28a745; }
+.status-pending { background-color: #fff8e1; color: #ffc107; }
+
+/* ▼▼▼ [추가] 승인 버튼 디자인 개선 ▼▼▼ */
+.btn-approve {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+    transition: background-color 0.2s ease;
+}
+.btn-approve:hover {
+    background-color: var(--primary-hover-color);
+}
+/* ▲▲▲ [추가] 승인 버튼 디자인 개선 ▲▲▲ */
+
+
+.header-user-info {
+    position: absolute; right: 2rem; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center; gap: 1rem;
+}
+
+#channel-switcher-container label { color: white; font-weight: 500; }
+#channel-switcher { padding: 6px 12px; border: 1px solid #6c757d; border-radius: 6px; background-color: #495057; color: white; cursor: pointer; }
+
+.delete-channel-btn { background-color: var(--danger-color); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background-color 0.2s ease; }
+.delete-channel-btn:hover { background-color: var(--danger-hover-color); }
+
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background-color: var(--card-bg-color); width: 90%; max-width: 600px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); }
+.modal-header h2 { margin: 0; font-size: 1.25rem; }
+.modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; color: var(--text-secondary-color); padding: 0; line-height: 1; }
+.modal-body { padding: 1.5rem; max-height: 70vh; overflow-y: auto; }
+#batch-summary-table tbody tr { cursor: pointer; }
+#batch-summary-table tbody tr:hover { background-color: #e9ecef; }
+.progress-cell { display: flex; align-items: center; gap: 8px; }
+.progress-bar-container { flex-grow: 1; background-color: #e9ecef; border-radius: 4px; overflow: hidden; }
+.progress-bar { height: 18px; background-color: var(--primary-color); transition: width 0.3s ease-in-out; }
+.progress-text { font-size: 0.9rem; font-weight: 500; color: var(--text-primary-color); flex-shrink: 0; }
+.lookup-btn { padding: 0 10px; height: 38px; margin-left: 5px; background-color: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.lookup-btn:hover { background-color: #5a6268; }
+.lookup-btn .material-icons { font-size: 1.2rem; }

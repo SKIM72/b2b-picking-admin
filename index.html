@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>B2B 출고 시스템 - 관리자 페이지</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="admin.style.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1 id="home-button" style="cursor: pointer;">B2B 출고 시스템 - 관리자</h1>
+        <div class="header-user-info">
+            <span id="current-user-email"></span>
+            <button id="logout-button" class="btn-secondary">로그아웃</button>
+        </div>
+    </header>
+    <nav>
+        <button id="nav-picking-status">출고 현황</button>
+        <button id="nav-batch-management">출고 업로드</button>
+        <button id="nav-products">상품 마스터</button>
+        <button id="nav-channels">채널 관리</button>
+        <button id="nav-users">사용자 관리</button>
+    </nav>
+    <main id="content-area">
+        </main>
+
+    <div id="batch-summary-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>출고 차수</h2>
+                <button class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-wrapper">
+                    <table id="batch-summary-table">
+                        <thead>
+                            <tr>
+                                <th>차수</th>
+                                <th>상태</th>
+                                <th>주문(건)</th>
+                                <th>완료(건)</th>
+                                <th>진행률</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.script.js" defer></script>
+</body>
+</html>
