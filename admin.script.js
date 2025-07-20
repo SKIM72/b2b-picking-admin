@@ -22,9 +22,7 @@ let currentProductMasterData = [];
 
 // --- 초기화 및 권한 확인 ---
 (async () => {
-    // ▼▼▼ [수정] 불필요한 닫는 괄호 '}' 삭제 ▼▼▼
     const { data: { session }, error } = await supabaseClient.auth.getSession();
-    // ▲▲▲ [수정] 불필요한 닫는 괄호 '}' 삭제 ▲▲▲
     
     if (error || !session || (session.user.email !== 'eowert72@gmail.com' && (!session.user.user_metadata || !session.user.user_metadata.is_admin))) {
         await supabaseClient.auth.signOut();
@@ -966,21 +964,45 @@ async function loadUsers() {
     const list = contentArea.querySelector('#user-list');
     list.innerHTML = `<li>불러오는 중...</li>`;
     const { data, error } = await supabaseClient.rpc('list_all_users');
-    if (error || data.length === 0) { list.innerHTML = `<li>가입한 사용자가 없습니다.</li>`; return; }
+    if (error) { list.innerHTML = `<li>사용자 목록 로딩 오류: ${error.message}</li>`; return; }
+    if (!data || data.length === 0) { list.innerHTML = `<li>가입한 사용자가 없습니다.</li>`; return; }
+
     list.innerHTML = data.map(user => {
-        const statusClass = user.is_approved ? 'status-approved' : 'status-pending';
-        const statusText = user.is_approved ? '승인 완료' : '승인 대기';
-        let actionButton = !user.is_approved ? `<button class="btn-approve approve-user-button" data-id="${user.id}">승인</button>` : '';
-        return `<li class="management-list-item"><span>${user.email}</span><div><span class="user-status ${statusClass}">${statusText}</span>${actionButton}</div></li>`;
+        const isAdmin = user.user_metadata && user.user_metadata.is_admin === true;
+        const isSuperAdmin = user.email === 'eowert72@gmail.com';
+        
+        const statusClass = isAdmin ? 'status-approved' : 'status-pending';
+        const statusText = isAdmin ? '승인 완료' : '승인 대기';
+        
+        let actionButton = '';
+        if (!isAdmin && !isSuperAdmin) {
+            actionButton = `<button class="btn-approve approve-user-button" data-id="${user.id}">승인</button>`;
+        }
+
+        return `<li class="management-list-item">
+                    <span>${user.email}</span>
+                    <div>
+                        <span class="user-status ${statusClass}">${statusText}</span>
+                        ${actionButton}
+                    </div>
+                </li>`;
     }).join('');
 }
 
+
 async function handleApproveUser(e) {
     const userId = e.target.dataset.id;
-    if (confirm('이 사용자를 승인하시겠습니까?')) {
-        const { error } = await supabaseClient.rpc('approve_user', { user_id_to_approve: userId });
-        if (error) { alert('승인 실패: ' + error.message); } 
-        else { alert('사용자가 승인되었습니다.'); showUserManagement(); }
+    if (confirm('이 사용자를 승인하고 관리자 권한을 부여하시겠습니까?')) {
+        const { data, error } = await supabaseClient.rpc('approve_and_grant_admin', {
+            user_id_to_approve: userId
+        });
+
+        if (error) {
+            alert('승인 실패: ' + error.message);
+        } else {
+            alert(data || '사용자가 승인되었습니다.');
+            showUserManagement();
+        }
     }
 }
 
