@@ -38,7 +38,11 @@ if (loginForm) {
 if (showSignup) {
     showSignup.addEventListener('click', (e) => {
         e.preventDefault();
-        // ▼▼▼ [수정] placeholder 추가 및 버튼 텍스트 변경 ▼▼▼
+
+        // 제목을 '회원가입'으로 변경하는 코드
+        document.getElementById('auth-title').textContent = '회원가입';
+
+        // 기존 코드
         authFormContainer.innerHTML = `
             <form id="signup-form">
                 <div class="input-group" style="margin-bottom: 1rem;">
@@ -56,7 +60,6 @@ if (showSignup) {
                 이미 계정이 있으신가요? <a href="login.html">로그인</a>
             </p>
         `;
-        // ▲▲▲ [수정] placeholder 추가 및 버튼 텍스트 변경 ▲▲▲
 
         // 동적으로 생성된 회원가입 폼에 이벤트 리스너 추가
         document.getElementById('signup-form').addEventListener('submit', async (ev) => {
