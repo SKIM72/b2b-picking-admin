@@ -211,9 +211,9 @@ async function handleBarcodeScan() {
         itemForModal = targetItem;
         document.getElementById('quantity-modal').style.display = 'flex';
         const quantityInput = document.getElementById('quantity-input');
-        quantityInput.value = '1';
+        // 1. [개선] 모달 창의 수량 입력 칸을 빈칸으로 초기화
+        quantityInput.value = ''; 
         quantityInput.focus();
-        quantityInput.select();
     } else {
         await processQuantityUpdate(targetItem, 1);
     }
@@ -228,6 +228,10 @@ function handleOrderCompletion() {
     playSound('success-sound');
     document.getElementById('barcode-input').disabled = true;
     setStatusMessage(`[${currentOrder.order_number}] 모든 상품의 검수가 완료되었습니다!`, 'success');
+    // 3. [개선] 검수 완료 시 커서를 출고지시번호 입력 칸으로 이동
+    const orderInput = document.getElementById('order-input');
+    orderInput.focus();
+    orderInput.select();
 }
 
 function updateProgress() {
@@ -397,12 +401,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             quantityModal.style.display = 'none';
             itemForModal = null;
+            // 2. [개선] 모달 창 닫힌 후 바코드 입력 칸으로 포커스
+            document.getElementById('barcode-input').focus();
         });
     }
     if(modalCancelButton) {
         modalCancelButton.addEventListener('click', () => {
             quantityModal.style.display = 'none';
             itemForModal = null;
+            // [개선] 취소 시에도 바코드 입력 칸으로 포커스
+            document.getElementById('barcode-input').focus();
         });
     }
     if(quantityInput) {
