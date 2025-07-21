@@ -212,10 +212,13 @@ async function handleBarcodeScan() {
         document.getElementById('quantity-modal').style.display = 'flex';
         const quantityInput = document.getElementById('quantity-input');
         
-        // ▼▼▼ 요청사항 1번 반영 부분 ▼▼▼
-        quantityInput.value = ''; // 모달 창의 수량 입력 칸을 빈칸으로 초기화
-        quantityInput.focus();    // 모달 창의 수량 입력 칸에 자동으로 커서 포커스
-        // ▲▲▲ 요청사항 1번 반영 부분 ▲▲▲
+        quantityInput.value = '';
+        
+        // ▼▼▼ [수정] PC 포커스 문제 해결 ▼▼▼
+        setTimeout(() => {
+            quantityInput.focus();
+        }, 100); // 0.1초 후 포커스를 실행하여 렌더링 시간 확보
+        // ▲▲▲ [수정] PC 포커스 문제 해결 ▲▲▲
 
     } else {
         await processQuantityUpdate(targetItem, 1);
@@ -405,19 +408,15 @@ document.addEventListener('DOMContentLoaded', () => {
             quantityModal.style.display = 'none';
             itemForModal = null;
             
-            // ▼▼▼ 요청사항 2번 반영 부분 ('확인' 클릭 시) ▼▼▼
-            document.getElementById('barcode-input').focus(); // 바코드 입력 칸으로 포커스
-            // ▲▲▲ 요청사항 2번 반영 부분 ('확인' 클릭 시) ▲▲▲
+            document.getElementById('barcode-input').focus();
         });
     }
     if(modalCancelButton) {
         modalCancelButton.addEventListener('click', () => {
             quantityModal.style.display = 'none';
             itemForModal = null;
-            
-            // ▼▼▼ 요청사항 2번 반영 부분 ('취소' 클릭 시) ▼▼▼
-            document.getElementById('barcode-input').focus(); // 바코드 입력 칸으로 포커스
-            // ▲▲▲ 요청사항 2번 반영 부분 ('취소' 클릭 시) ▲▲▲
+
+            document.getElementById('barcode-input').focus();
         });
     }
     if(quantityInput) {
