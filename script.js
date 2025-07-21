@@ -211,9 +211,12 @@ async function handleBarcodeScan() {
         itemForModal = targetItem;
         document.getElementById('quantity-modal').style.display = 'flex';
         const quantityInput = document.getElementById('quantity-input');
-        // 1. [개선] 모달 창의 수량 입력 칸을 빈칸으로 초기화
-        quantityInput.value = ''; 
-        quantityInput.focus();
+        
+        // ▼▼▼ 요청사항 1번 반영 부분 ▼▼▼
+        quantityInput.value = ''; // 모달 창의 수량 입력 칸을 빈칸으로 초기화
+        quantityInput.focus();    // 모달 창의 수량 입력 칸에 자동으로 커서 포커스
+        // ▲▲▲ 요청사항 1번 반영 부분 ▲▲▲
+
     } else {
         await processQuantityUpdate(targetItem, 1);
     }
@@ -228,7 +231,7 @@ function handleOrderCompletion() {
     playSound('success-sound');
     document.getElementById('barcode-input').disabled = true;
     setStatusMessage(`[${currentOrder.order_number}] 모든 상품의 검수가 완료되었습니다!`, 'success');
-    // 3. [개선] 검수 완료 시 커서를 출고지시번호 입력 칸으로 이동
+
     const orderInput = document.getElementById('order-input');
     orderInput.focus();
     orderInput.select();
@@ -401,16 +404,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             quantityModal.style.display = 'none';
             itemForModal = null;
-            // 2. [개선] 모달 창 닫힌 후 바코드 입력 칸으로 포커스
-            document.getElementById('barcode-input').focus();
+            
+            // ▼▼▼ 요청사항 2번 반영 부분 ('확인' 클릭 시) ▼▼▼
+            document.getElementById('barcode-input').focus(); // 바코드 입력 칸으로 포커스
+            // ▲▲▲ 요청사항 2번 반영 부분 ('확인' 클릭 시) ▲▲▲
         });
     }
     if(modalCancelButton) {
         modalCancelButton.addEventListener('click', () => {
             quantityModal.style.display = 'none';
             itemForModal = null;
-            // [개선] 취소 시에도 바코드 입력 칸으로 포커스
-            document.getElementById('barcode-input').focus();
+            
+            // ▼▼▼ 요청사항 2번 반영 부분 ('취소' 클릭 시) ▼▼▼
+            document.getElementById('barcode-input').focus(); // 바코드 입력 칸으로 포커스
+            // ▲▲▲ 요청사항 2번 반영 부분 ('취소' 클릭 시) ▲▲▲
         });
     }
     if(quantityInput) {
