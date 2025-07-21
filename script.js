@@ -376,6 +376,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if(resetOrderButton) resetOrderButton.addEventListener('click', handleResetOrder);
     if(refreshButton) refreshButton.addEventListener('click', handleOrderSubmit);
+
+    // 상품 수량 수정 기능 비활성화
+    /*
     if (pickingItemsContainer) {
         pickingItemsContainer.addEventListener('click', (e) => {
             const row = e.target.closest('tr');
@@ -384,6 +387,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    */
+
     if(modalConfirmButton) {
         modalConfirmButton.addEventListener('click', async () => {
             const qty = parseInt(quantityInput.value, 10);
