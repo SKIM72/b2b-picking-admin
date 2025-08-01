@@ -89,6 +89,14 @@ navButtons.forEach(button => {
         navButtons.forEach(btn => btn.classList.remove('active'));
         e.target.classList.add('active');
         
+        // 다른 메뉴로 이동 시 grid 스타일 초기화
+        if (e.target.id !== 'nav-picking-status') {
+             contentArea.style.display = 'flex';
+             contentArea.style.gridTemplateRows = '';
+             contentArea.style.overflowY = 'auto';
+             contentArea.style.height = '';
+        }
+
         switch (e.target.id) {
             case 'nav-picking-status': showPickingStatus(); break;
             case 'nav-batch-management': showBatchManagement(); break;
@@ -104,8 +112,8 @@ navButtons.forEach(button => {
 contentArea.addEventListener('click', function(e) {
     const target = e.target.closest('button');
     if (!target) return;
-
-    if (target.id === 'refresh-picking-status-btn') showPickingStatus();
+    
+    if (target.id === 'refresh-picking-status-btn') loadPickingStatusByDateRange();
     if (target.id === 'refresh-batch-details-btn') loadBatchDetails();
     if (target.id === 'refresh-product-master-btn') renderProductTable();
     if (target.id === 'refresh-channels-btn') showChannelManagement();
@@ -115,15 +123,7 @@ contentArea.addEventListener('click', function(e) {
         if (!currentPickingStatusData || currentPickingStatusData.length === 0) {
             alert('다운로드할 데이터가 없습니다.'); return;
         }
-        const dataToExport = currentPickingStatusData.map(order => ({
-            '출고지시번호': order.order_number,
-            '출고지 주소': order.destination_address,
-            '수취인': order.recipient,
-            '지시수량': order.total_expected_quantity,
-            '완료수량': order.total_picked_quantity,
-            '상태': order.status
-        }));
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const worksheet = XLSX.utils.json_to_sheet(currentPickingStatusData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, '출고현황');
         XLSX.writeFile(workbook, `출고현황_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -682,31 +682,52 @@ async function handleDeleteBatch(batchId) {
 // 출고 현황 (조회 전용)
 // =================================================================
 async function showPickingStatus() {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    // Grid 레이아웃을 main content-area에 적용
+    contentArea.style.display = 'grid';
+    contentArea.style.height = `calc(100vh - ${contentArea.offsetTop}px)`;
+    contentArea.style.gridTemplateRows = 'auto 1fr';
+    contentArea.style.overflow = 'hidden';
+
     contentArea.innerHTML = `
-        <div class="content-section">
-            <div class="sticky-controls">
-                <div class="page-header">
-                    <h2>출고 현황 조회</h2>
-                    <div class="actions-group">
-                        <button id="refresh-picking-status-btn" class="btn-secondary">새로고침</button>
-                        <button id="download-picking-status-btn" class="btn-primary">엑셀 다운로드</button>
-                    </div>
+        <div class="top-controls" style="padding-bottom: 1.5rem; z-index: 10;">
+            <div class="page-header">
+                <h2>출고 현황 조회</h2>
+                <div class="actions-group">
+                    <button id="refresh-picking-status-btn" class="btn-secondary">새로고침</button>
+                    <button id="download-picking-status-btn" class="btn-primary">엑셀 다운로드</button>
                 </div>
-                <div class="card">
-                    <div class="card-body">
-                        <label>날짜 선택:</label>
-                        <input type="date" id="status-date-picker" value="${new Date().toISOString().split('T')[0]}">
-                        <label>차수 선택:</label>
-                        <select id="status-batch-selector"><option>날짜를 먼저 선택하세요</option></select>
+            </div>
+            <div class="card">
+                <div class="card-body" style="flex-direction: column; align-items: stretch; gap: 1rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <label>날짜 범위:</label>
+                        <input type="date" id="status-start-date-picker" value="${firstDay}">
+                        <span>~</span>
+                        <input type="date" id="status-end-date-picker" value="${lastDay}">
+                        <button id="today-btn" class="btn-secondary" style="margin-left: 0.5rem; background-color: #6c757d;">금일</button>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <label>필터:</label>
+                        <input type="text" id="order-number-filter" placeholder="출고지시번호 검색" class="filter-input" style="width: 200px;">
+                        <input type="text" id="recipient-filter" placeholder="수취인 검색" class="filter-input" style="width: 200px;">
+                        <button id="query-picking-status-btn" class="btn-primary" style="margin-left: 1rem;">조회</button>
                     </div>
                 </div>
             </div>
-            <div class="card" style="flex-grow: 1; display: flex; flex-direction: column;">
+        </div>
+        <div class="table-scroll-container" style="overflow-y: auto;">
+             <div class="card" id="picking-status-table-card">
                 <div class="card-header">출고 진행 현황</div>
-                <div class="table-wrapper" style="flex-grow: 1;">
+                <div class="table-wrapper">
                     <table id="picking-status-table">
                         <thead>
                             <tr>
+                                <th>출고일자</th>
+                                <th>차수</th>
                                 <th>출고지시번호</th>
                                 <th>출고지 주소</th>
                                 <th>수취인</th>
@@ -719,50 +740,144 @@ async function showPickingStatus() {
                     </table>
                 </div>
             </div>
-        </div>`;
-    const datePicker = contentArea.querySelector('#status-date-picker');
-    const batchSelector = contentArea.querySelector('#status-batch-selector');
-    await populateStatusBatchSelector(datePicker.value);
-    datePicker.addEventListener('change', e => populateStatusBatchSelector(e.target.value));
-    batchSelector.addEventListener('change', e => loadPickingOrdersForStatus(e.target.value));
+        </div>
+        `;
+    
+    // 이벤트 리스너 설정
+    document.getElementById('query-picking-status-btn').addEventListener('click', loadPickingStatusByDateRange);
+    
+    document.getElementById('today-btn').addEventListener('click', () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        document.getElementById('status-start-date-picker').value = todayStr;
+        document.getElementById('status-end-date-picker').value = todayStr;
+    });
+
+    contentArea.querySelectorAll('.filter-input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                loadPickingStatusByDateRange();
+            }
+        });
+    });
+    
+    await loadPickingStatusByDateRange();
 }
 
-async function populateStatusBatchSelector(date) {
-    const selector = contentArea.querySelector('#status-batch-selector');
-    const tbody = contentArea.querySelector('#picking-status-table tbody');
-    selector.innerHTML = `<option>불러오는 중...</option>`;
-    if (tbody) tbody.innerHTML = '';
-    currentPickingStatusData = [];
-    const { data, error } = await supabaseClient.from('picking_batches').select('id, batch_number').eq('batch_date', date).eq('channel_id', currentChannelId).order('batch_number');
-    if (error || data.length === 0) {
-        selector.innerHTML = `<option>해당 날짜에 차수 없음</option>`;
-        if(tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">표시할 데이터가 없습니다.</td></tr>`;
-        return;
-    }
-    selector.innerHTML = `<option value="">-- 차수 선택 --</option>` + data.map(b => `<option value="${b.id}">${b.batch_number}차수</option>`).join('');
-}
-
-async function loadPickingOrdersForStatus(batchId) {
+async function loadPickingStatusByDateRange() {
     const tbody = contentArea.querySelector('#picking-status-table tbody');
     if (!tbody) return;
-    if (!batchId) { tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">차수를 선택하세요.</td></tr>`; currentPickingStatusData = []; return; }
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">불러오는 중...</td></tr>`;
-    const { data, error } = await supabaseClient.from('picking_orders').select(`*`).eq('batch_id', batchId).order('id');
 
-    currentPickingStatusData = data || [];
+    const startDate = contentArea.querySelector('#status-start-date-picker').value;
+    const endDate = contentArea.querySelector('#status-end-date-picker').value;
 
-    if (error || data.length === 0) { tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">데이터가 없습니다.</td></tr>`; return; }
-    tbody.innerHTML = data.map(order =>
-        `<tr>
-            <td>${order.order_number}</td>
-            <td>${order.destination_address || ''}</td>
-            <td>${order.recipient || ''}</td>
-            <td>${order.total_expected_quantity}</td>
-            <td>${order.total_picked_quantity}</td>
-            <td>${order.status}</td>
-        </tr>`
-    ).join('');
+    if (!startDate || !endDate) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">날짜 범위를 올바르게 선택해주세요.</td></tr>`;
+        currentPickingStatusData = [];
+        return;
+    }
+
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem;">현황을 불러오는 중...</td></tr>`;
+
+    try {
+        const { data: batches, error: batchError } = await supabaseClient
+            .from('picking_batches')
+            .select('id')
+            .eq('channel_id', currentChannelId)
+            .gte('batch_date', startDate)
+            .lte('batch_date', endDate);
+
+        if (batchError) throw batchError;
+        
+        if (!batches || batches.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem;">해당 기간에 데이터가 없습니다.</td></tr>`;
+            currentPickingStatusData = [];
+            return;
+        }
+
+        const batchIds = batches.map(b => b.id);
+
+        const { data, error } = await supabaseClient
+            .from('picking_orders')
+            .select(`*, picking_batches (batch_date, batch_number)`)
+            .in('batch_id', batchIds)
+            .order('id', { ascending: false });
+
+        if (error) throw error;
+        
+        const allDataInPeriod = data.map(order => ({
+            "출고일자": order.picking_batches.batch_date,
+            "차수": order.picking_batches.batch_number,
+            "출고지시번호": order.order_number,
+            "출고지 주소": order.destination_address,
+            "수취인": order.recipient,
+            "지시수량": order.total_expected_quantity,
+            "완료수량": order.total_picked_quantity,
+            "상태": order.status
+        }));
+
+        const orderFilter = document.getElementById('order-number-filter').value.trim().toLowerCase();
+        const recipientFilter = document.getElementById('recipient-filter').value.trim().toLowerCase();
+
+        let filteredData = allDataInPeriod;
+        if (orderFilter) {
+            filteredData = filteredData.filter(order => 
+                order['출고지시번호'].toLowerCase().includes(orderFilter)
+            );
+        }
+        if (recipientFilter) {
+            filteredData = filteredData.filter(order => 
+                order['수취인'] && order['수취인'].toLowerCase().includes(recipientFilter)
+            );
+        }
+
+        currentPickingStatusData = filteredData;
+        
+        if (filteredData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem;">조회된 데이터가 없습니다.</td></tr>`;
+        } else {
+            tbody.innerHTML = filteredData.map(order =>
+                `<tr class="${order.상태 === '완료' ? 'completed-row' : ''}">
+                    <td style="text-align: center;">${order.출고일자}</td>
+                    <td style="text-align: center;">${order.차수}</td>
+                    <td style="text-align: center;">${order.출고지시번호}</td>
+                    <td style="text-align: center;">${order['출고지 주소'] || ''}</td>
+                    <td style="text-align: center;">${order.수취인 || ''}</td>
+                    <td style="text-align: center;">${order.지시수량}</td>
+                    <td style="text-align: center;">${order.완료수량}</td>
+                    <td style="text-align: center;">${order.상태}</td>
+                </tr>`
+            ).join('');
+        }
+        
+        const cardHeader = contentArea.querySelector('#picking-status-table-card .card-header');
+        const tableWrapper = contentArea.querySelector('#picking-status-table-card .table-wrapper');
+        const tableHeaders = contentArea.querySelectorAll('#picking-status-table thead th');
+        
+        if (cardHeader && tableWrapper && tableHeaders.length > 0) {
+            tableWrapper.style.overflow = 'visible';
+
+            cardHeader.style.position = 'sticky';
+            cardHeader.style.top = '0';
+            cardHeader.style.zIndex = '2';
+            cardHeader.style.backgroundColor = 'var(--card-bg-color, white)';
+            
+            setTimeout(() => {
+                const cardHeaderHeight = cardHeader.offsetHeight;
+                tableHeaders.forEach(th => {
+                    th.style.position = 'sticky';
+                    th.style.top = `${cardHeaderHeight}px`;
+                    th.style.zIndex = '1';
+                    th.style.backgroundColor = '#f8f9fa';
+                });
+            }, 0);
+        }
+
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:red; padding: 2rem;">데이터 조회 중 오류가 발생했습니다: ${err.message}</td></tr>`;
+        currentPickingStatusData = [];
+    }
 }
+
 
 // =================================================================
 // 상품 마스터 관리
