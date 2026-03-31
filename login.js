@@ -42,23 +42,32 @@ if (showSignup) {
         // 제목을 '회원가입'으로 변경하는 코드
         document.getElementById('auth-title').textContent = '회원가입';
 
-        // 기존 코드
+        // 바뀐 디자인의 템플릿 적용
         authFormContainer.innerHTML = `
-            <form id="signup-form">
-                <div class="input-group" style="margin-bottom: 1rem;">
-                    <label for="signup-email">이메일</label>
-                    <input type="email" id="signup-email" required placeholder="사용할 이메일 입력">
+            <form id="signup-form" class="space-y-5">
+                <div class="space-y-2">
+                    <label for="signup-email" class="text-sm font-bold text-on-surface-variant ml-1">이메일</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-[20px]">mail</span>
+                        <input type="email" id="signup-email" required placeholder="사용할 이메일 입력" class="w-full pl-11 pr-4 py-3.5 bg-white border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 outline-none text-on-surface placeholder:text-outline/60">
+                    </div>
                 </div>
-                <div class="input-group" style="margin-bottom: 1.5rem;">
-                    <label for="signup-password">비밀번호 (6자 이상)</label>
-                    <input type="password" id="signup-password" required minlength="6" placeholder="6자 이상 입력">
+                <div class="space-y-2">
+                    <label for="signup-password" class="text-sm font-bold text-on-surface-variant ml-1">비밀번호 (6자 이상)</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-[20px]">lock</span>
+                        <input type="password" id="signup-password" required minlength="6" placeholder="6자 이상 입력" class="w-full pl-11 pr-4 py-3.5 bg-white border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 outline-none text-on-surface placeholder:text-outline/60">
+                    </div>
                 </div>
-                <button type="submit" class="channel-button">가입 요청</button>
+                <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-lg shadow-lg shadow-primary/25 transition-all duration-200 active:scale-[0.98] mt-4 flex items-center justify-center gap-2">
+                    가입 요청
+                </button>
             </form>
-            <p id="auth-message" style="color: red; text-align: center; margin-top: 1rem;"></p>
-            <p style="text-align: center; margin-top: 2rem;">
-                이미 계정이 있으신가요? <a href="login.html">로그인</a>
-            </p>
+            <p id="auth-message" class="text-red-500 text-sm text-center mt-4 min-h-[1.25rem] font-medium"></p>
+            <div class="mt-10 pt-8 border-t border-outline-variant/30 text-center">
+                <p class="text-on-surface-variant text-sm mb-3">이미 계정이 있으신가요?</p>
+                <a href="login.html" class="inline-block text-primary font-bold text-sm hover:underline hover:text-primary-hover transition-colors">로그인</a>
+            </div>
         `;
 
         // 동적으로 생성된 회원가입 폼에 이벤트 리스너 추가
@@ -76,7 +85,7 @@ if (showSignup) {
             if (error) {
                 messageEl.textContent = '회원가입 실패: ' + error.message;
             } else {
-                messageEl.style.color = 'green';
+                messageEl.className = 'text-green-600 text-sm text-center mt-4 min-h-[1.25rem] font-medium';
                 messageEl.textContent = '회원가입 성공! 관리자 승인 후 로그인이 가능합니다.';
                 ev.target.reset();
             }

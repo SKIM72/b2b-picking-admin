@@ -11,13 +11,61 @@ const userEmailDisplay = document.getElementById('current-user-email');
 const batchSummaryModal = document.getElementById('batch-summary-modal');
 
 
-// --- 상태 관리 변수 ---
+// --- 상태 관리 변수 (필터 유지용 추가) ---
 let currentChannelId = localStorage.getItem('adminSelectedChannelId') || null;
-let currentFilters = { product_code: '', barcode: '', product_name: '' };
 let currentSort = { column: 'id', direction: 'desc' };
 let currentPickingStatusData = [];
 let currentBatchDetailsData = [];
 let currentProductMasterData = [];
+
+// 탭 이동 시에도 유지될 필터 상태 객체 선언
+let currentFilters = { product_code: '', barcode: '', product_name: '' };
+let currentPickingFilters = {
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    orderNumber: '',
+    recipient: ''
+};
+let currentBatchFilters = {
+    date: new Date().toISOString().split('T')[0],
+    batchNumber: ''
+};
+
+// 모던 달력 라이브러리(Flatpickr) 동적 로드 함수
+const loadCalendarLibrary = async () => {
+    if (document.getElementById('flatpickr-css')) return;
+    
+    const css = document.createElement('link');
+    css.id = 'flatpickr-css';
+    css.rel = 'stylesheet';
+    css.href = 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css';
+    document.head.appendChild(css);
+    
+    await new Promise(r => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
+        script.onload = r;
+        document.head.appendChild(script);
+    });
+    await new Promise(r => {
+        const script = document.createElement('script');
+        script.src = 'https://npmcdn.com/flatpickr/dist/l10n/ko.js';
+        script.onload = r;
+        document.head.appendChild(script);
+    });
+};
+
+// 모던 달력 적용 함수
+const applyModernCalendar = () => {
+    if(window.flatpickr) {
+        flatpickr('input[type="date"]', {
+            locale: "ko",
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "Y-m-d (D)"
+        });
+    }
+};
 
 
 // --- 초기화 및 권한 확인 ---
@@ -41,6 +89,7 @@ let currentProductMasterData = [];
         }
     });
 
+    await loadCalendarLibrary(); // 모던 달력 로드
     await setupChannelSwitcher();
     
     document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
@@ -73,8 +122,21 @@ async function setupChannelSwitcher() {
         localStorage.removeItem('adminSelectedChannelId');
     }
 
-    const switcherHTML = `<div id="channel-switcher-container"><label for="channel-switcher" style="color: white; font-weight: 500; margin-right: 8px;">채널:</label><select id="channel-switcher" style="padding: 5px; border-radius: 4px;">${channels.map(c => `<option value="${c.id}" ${c.id == currentChannelId ? 'selected' : ''}>${c.name}</option>`).join('')}</select></div>`;
-    nav.insertAdjacentHTML('afterbegin', switcherHTML);
+    const switcherHTML = `<div id="channel-switcher-container" style="display: flex; align-items: center;"><label for="channel-switcher" style="color: #64748b; font-weight: 600; font-size: 0.85rem; margin-right: 8px;">채널:</label><select id="channel-switcher" style="padding: 0.4rem 1.5rem 0.4rem 0.8rem; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #ffffff; color: #334155; font-size: 0.85rem; cursor: pointer; outline: none; min-width: 120px;">${channels.map(c => `<option value="${c.id}" ${c.id == currentChannelId ? 'selected' : ''}>${c.name}</option>`).join('')}</select></div>`;
+    
+    // 메뉴바(nav) 항목 왼쪽 정렬 (채널 선택 바로 옆으로 배치)
+    const btnWrapper = document.createElement('div');
+    btnWrapper.style.display = 'flex';
+    btnWrapper.style.gap = '0.5rem';
+    while(nav.firstChild) {
+        btnWrapper.appendChild(nav.firstChild);
+    }
+    nav.style.display = 'flex';
+    nav.style.justifyContent = 'flex-start'; // 왼쪽 정렬
+    nav.style.alignItems = 'center';
+    nav.style.gap = '1.5rem'; // 채널 선택 드롭다운과 탭 사이 간격 추가
+    nav.innerHTML = switcherHTML;
+    nav.appendChild(btnWrapper);
 
     document.getElementById('channel-switcher').addEventListener('change', e => {
         currentChannelId = e.target.value;
@@ -113,9 +175,37 @@ contentArea.addEventListener('click', function(e) {
     const target = e.target.closest('button');
     if (!target) return;
     
-    if (target.id === 'refresh-picking-status-btn') loadPickingStatusByDateRange();
-    if (target.id === 'refresh-batch-details-btn') loadBatchDetails();
-    if (target.id === 'refresh-product-master-btn') renderProductTable();
+    // 새로고침 시 초기화 로직 연동
+    if (target.id === 'refresh-picking-status-btn') {
+        const todayStr = new Date().toISOString().split('T')[0];
+        currentPickingFilters = { startDate: todayStr, endDate: todayStr, orderNumber: '', recipient: '' };
+        
+        const startPicker = document.getElementById('status-start-date-picker');
+        const endPicker = document.getElementById('status-end-date-picker');
+        const orderFilter = document.getElementById('order-number-filter');
+        const recipientFilter = document.getElementById('recipient-filter');
+        
+        if(startPicker) startPicker._flatpickr ? startPicker._flatpickr.setDate(todayStr) : startPicker.value = todayStr;
+        if(endPicker) endPicker._flatpickr ? endPicker._flatpickr.setDate(todayStr) : endPicker.value = todayStr;
+        if(orderFilter) orderFilter.value = '';
+        if(recipientFilter) recipientFilter.value = '';
+        
+        loadPickingStatusByDateRange();
+        loadTodaySummary();
+    }
+    
+    if (target.id === 'refresh-batch-details-btn') {
+        currentBatchFilters = { date: new Date().toISOString().split('T')[0], batchNumber: '' };
+        loadBatchDetails();
+        showBatchManagement(); // UI 리렌더링
+    }
+    
+    if (target.id === 'refresh-product-master-btn') {
+        currentFilters = { product_code: '', barcode: '', product_name: '' };
+        contentArea.querySelectorAll('.filter-input').forEach(input => input.value = '');
+        renderProductTable();
+    }
+
     if (target.id === 'refresh-channels-btn') showChannelManagement();
     if (target.id === 'refresh-users-btn') showUserManagement();
 
@@ -208,6 +298,22 @@ contentArea.addEventListener('change', function(e) {
     if (e.target.classList.contains('select-all-checkbox')) {
         contentArea.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = e.target.checked);
     }
+    
+    // 파일 업로드 UI 이름 변경 이벤트
+    if (e.target.type === 'file') {
+        const fileNameSpan = e.target.closest('label')?.querySelector('.file-name');
+        if (fileNameSpan) {
+            if (e.target.files.length > 0) {
+                fileNameSpan.textContent = e.target.files[0].name;
+                fileNameSpan.style.color = 'var(--text-primary-color)';
+                fileNameSpan.style.fontWeight = '500';
+            } else {
+                fileNameSpan.textContent = '선택된 파일 없음';
+                fileNameSpan.style.color = 'var(--text-secondary-color)';
+                fileNameSpan.style.fontWeight = 'normal';
+            }
+        }
+    }
 });
 
 
@@ -252,15 +358,13 @@ async function showBatchSummaryModal(date) {
             let progressHtml;
             if (progress > 0) {
                 progressHtml = `
-                    <div class="progress-cell">
-                        <div class="progress-bar-container">
-                            <div class="progress-bar" style="width: ${progress.toFixed(2)}%;"></div>
-                        </div>
-                        <span class="progress-text">${progress.toFixed(1)}%</span>
+                    <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                        <div style="width: ${Math.max(progress * 0.5, 10)}px; height: 18px; background-color: #007bff; border-radius: 4px;"></div>
+                        <span style="font-size: 0.9rem; font-weight: 500; color: #212529;">${progress.toFixed(1)}%</span>
                     </div>
                 `;
             } else {
-                progressHtml = `<span class="progress-text">0.0%</span>`;
+                progressHtml = `<span style="font-size: 0.9rem; font-weight: 500; color: #212529;">0.0%</span>`;
             }
 
             tableHtml += `
@@ -269,7 +373,7 @@ async function showBatchSummaryModal(date) {
                     <td style="text-align: center;">${batch.status || '대기'}</td>
                     <td style="text-align: center;">${batch.order_count}</td>
                     <td style="text-align: center;">${batch.completed_count}</td>
-                    <td>${progressHtml}</td>
+                    <td style="text-align: center;">${progressHtml}</td>
                 </tr>
             `;
         });
@@ -281,24 +385,30 @@ async function showBatchSummaryModal(date) {
 }
 
 
+// 채널 관리 UI 여백 및 디자인 개선
 async function showChannelManagement() {
     contentArea.innerHTML = `
-        <div class="content-section">
-            <div class="page-header">
+        <div class="content-section" style="max-width: 900px; margin: 0 auto; width: 100%; padding-top: 1rem;">
+            <div class="page-header" style="margin-bottom: 2rem;">
                 <h2>채널 관리</h2>
                 <div class="actions-group">
                     <button id="refresh-channels-btn" class="btn-secondary">새로고침</button>
                 </div>
             </div>
-            <div class="card">
-                <div class="card-header">새 채널 추가</div>
-                <div class="card-body">
-                    <input type="text" id="new-channel-name" placeholder="새 채널 이름">
-                    <button id="add-channel-btn" class="btn-primary">추가</button>
+            <div class="card" style="margin-bottom: 2rem;">
+                <div class="card-header" style="background-color: #f8fafd;">새 채널 추가</div>
+                <div class="card-body" style="padding: 1.5rem;">
+                    <div style="display: flex; align-items: center; border: 1px solid #e2e8f0; border-radius: 6px; background-color: #fff; overflow: hidden; width: 100%;">
+                        <input type="text" id="new-channel-name" placeholder="추가할 새 채널 이름을 입력하세요 (예: 쿠팡 윙)" style="flex-grow: 1; padding: 0.8rem 1rem; border: none; outline: none; background: transparent; font-size: 0.95rem;">
+                        <button id="add-channel-btn" class="btn-primary" style="margin: 4px; padding: 0.6rem 1.5rem; border-radius: 4px; white-space: nowrap;">추가하기</button>
+                    </div>
                 </div>
             </div>
             <div class="card">
-                <div class="card-header">채널 목록</div>
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background-color: #f8fafd;">
+                    <span>운영 중인 채널 목록</span>
+                    <span style="font-size: 0.8rem; font-weight: normal; color: #ef4444;">※ 채널 삭제 시 관련된 모든 상품 및 출고 데이터가 삭제됩니다.</span>
+                </div>
                 <ul id="channel-list" class="management-list"></ul>
             </div>
         </div>`;
@@ -318,8 +428,8 @@ async function loadChannelsForManagement() {
     list.innerHTML = `<li>불러오는 중...</li>`;
     const { data, error } = await supabaseClient.from('channels').select('*').order('name');
     if (error) { list.innerHTML = `<li>오류: ${error.message}</li>`; return; }
-    if (data.length === 0) { list.innerHTML = `<li>생성된 채널이 없습니다.</li>`; return; }
-    list.innerHTML = data.map(c => `<li class="management-list-item"><span>${c.name}</span><button class="btn-danger delete-channel-btn" data-id="${c.id}">삭제</button></li>`).join('');
+    if (data.length === 0) { list.innerHTML = `<li style="padding:2rem; text-align:center; color:#64748b;">생성된 채널이 없습니다.</li>`; return; }
+    list.innerHTML = data.map(c => `<li class="management-list-item" style="padding: 1.2rem 1.5rem;"><span>${c.name}</span><button class="btn-danger delete-channel-btn" data-id="${c.id}">삭제</button></li>`).join('');
 }
 
 async function handleAddChannel() {
@@ -347,36 +457,46 @@ async function handleDeleteChannel(channelId) {
 }
 
 // =================================================================
-// 출고 차수 관리 (틀 고정 및 디자인 개선)
+// 출고 차수 관리 (디자인 개선 및 아이콘 변경, 필터 유지)
 // =================================================================
 async function showBatchManagement() {
     contentArea.innerHTML = `
-        <div class="content-section">
+        <div class="content-section" style="max-width: 1400px; margin: 0 auto; width: 100%;">
             <div class="sticky-controls">
-                <div class="page-header">
+                <div class="page-header" style="margin-bottom: 1.5rem;">
                     <h2>출고 업로드 및 확인</h2>
                      <div class="actions-group">
-                        <button id="refresh-batch-details-btn" class="btn-secondary">새로고침</button>
+                        <button id="refresh-batch-details-btn" class="btn-secondary">초기화 및 새로고침</button>
                         <button id="download-batch-details-btn" class="btn-primary">엑셀 다운로드</button>
                     </div>
                 </div>
-                <div class="card">
-                    <div class="card-body">
-                        <label>예정일:</label>
-                        <input type="date" id="work-date-picker" value="${new Date().toISOString().split('T')[0]}">
-                        <label style="margin-left: 20px;">업로드차수:</label>
-                        <input type="number" id="batch-number-input" placeholder="차수" min="1" style="width: 80px;">
-                        <button id="show-batch-summary-btn" class="lookup-btn" title="차수 현황 보기">
-                            <i class="material-icons">search</i>
-                        </button>
-                        <button id="query-batch-btn" class="btn-primary" style="margin-left: 5px;">조회</button>
-                        <button id="new-batch-btn" class="btn-secondary">신규</button>
+                
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-body" style="display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 1.5rem; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <label style="font-weight: 600; font-size: 0.85rem; color: #64748b; white-space: nowrap;">예정일:</label>
+                                <input type="date" id="work-date-picker" value="${currentBatchFilters.date}" style="width: 150px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <label style="font-weight: 600; font-size: 0.85rem; color: #64748b; white-space: nowrap;">업로드차수:</label>
+                                <input type="number" id="batch-number-input" placeholder="차수 입력" min="1" value="${currentBatchFilters.batchNumber}" style="width: 120px;">
+                            </div>
+                            
+                            <button id="show-batch-summary-btn" title="차수 현황 보기" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background-color: #f0f4ff; color: #5A73E4; border: none; border-radius: 6px; cursor: pointer; transition: background-color 0.2s;">
+                                <span class="material-symbols-outlined" style="font-size: 20px;">assignment</span>
+                            </button>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="new-batch-btn" class="btn-secondary">신규 차수 생성</button>
+                            <button id="query-batch-btn" class="btn-primary" style="white-space: nowrap;">조회하기</button>
+                        </div>
                     </div>
                 </div>
                 <div id="batch-summary-section"></div>
                 <div id="batch-upload-section"></div>
             </div>
-            <div id="batch-details-section" class="table-wrapper">
+            <div id="batch-details-section" class="table-wrapper" style="margin-top: 1rem;">
             </div>
         </div>`;
 
@@ -386,24 +506,37 @@ async function showBatchManagement() {
             loadBatchDetails();
         }
     });
+
+    // 필터 데이터가 이미 있다면 자동 조회
+    if(currentBatchFilters.date && currentBatchFilters.batchNumber) {
+        loadBatchDetails();
+    }
+    
+    applyModernCalendar(); // 모던 달력 적용
 }
 
 async function loadBatchDetails() {
     const batchInput = contentArea.querySelector('#batch-number-input');
-    const date = contentArea.querySelector('#work-date-picker').value;
-    const batchNumber = batchInput.value;
+    const dateInput = contentArea.querySelector('#work-date-picker');
+    const date = dateInput ? dateInput.value : currentBatchFilters.date;
+    const batchNumber = batchInput ? batchInput.value : currentBatchFilters.batchNumber;
+    
+    // 상태 저장
+    currentBatchFilters.date = date;
+    currentBatchFilters.batchNumber = batchNumber;
+
     const uploadSection = contentArea.querySelector('#batch-upload-section');
     const summarySection = contentArea.querySelector('#batch-summary-section');
     const detailsSection = contentArea.querySelector('#batch-details-section');
 
     if (!date || !batchNumber) {
-        detailsSection.innerHTML = `<p style="text-align:center; padding:2rem;">날짜와 차수를 모두 입력하고 조회하세요.</p>`;
+        detailsSection.innerHTML = `<p style="text-align:center; padding:3rem; color:#64748b;">날짜와 차수를 입력하고 조회해주세요.</p>`;
         uploadSection.innerHTML = '';
         summarySection.innerHTML = '';
         return;
     }
 
-    detailsSection.innerHTML = `<p style="text-align:center; padding:2rem;">불러오는 중...</p>`;
+    detailsSection.innerHTML = `<p style="text-align:center; padding:3rem;">데이터를 불러오는 중입니다...</p>`;
     summarySection.innerHTML = '';
     currentBatchDetailsData = [];
 
@@ -413,19 +546,31 @@ async function loadBatchDetails() {
     const batchStatus = batchData ? batchData.status : '신규';
 
     uploadSection.innerHTML = `
-        <div class="control-grid">
+        <div class="control-grid" style="margin-top: 0;">
             <div class="card">
-                <div class="card-header"><strong>${batchNumber}차수</strong> - 표준 양식</div>
-                <div class="card-body">
+                <div class="card-header" style="background-color: #f8fafd;"><strong>${batchNumber}차수</strong> - 표준 양식</div>
+                <div class="card-body" style="padding: 1.5rem;">
                     <button class="download-standard-template btn-secondary">양식 다운로드</button>
-                    <input type="file" class="standard-excel-input" accept=".xlsx, .xls" style="flex-grow:1;">
+                    <div class="custom-file-input" style="flex-grow:1;">
+                        <label>
+                            <input type="file" class="standard-excel-input" accept=".xlsx, .xls">
+                            <span class="file-name">선택된 파일 없음</span>
+                            <span class="file-btn">파일 선택</span>
+                        </label>
+                    </div>
                     <button class="upload-standard-btn btn-primary" data-date="${date}" data-batch="${batchNumber}">업로드</button>
                 </div>
             </div>
             <div class="card">
-                <div class="card-header"><strong>${batchNumber}차수</strong> - CORN 양식</div>
-                <div class="card-body">
-                    <input type="file" class="corn-excel-input" accept=".xlsx, .xls" style="flex-grow:1;">
+                <div class="card-header" style="background-color: #f8fafd;"><strong>${batchNumber}차수</strong> - CORN 양식</div>
+                <div class="card-body" style="padding: 1.5rem;">
+                    <div class="custom-file-input" style="flex-grow:1;">
+                        <label>
+                            <input type="file" class="corn-excel-input" accept=".xlsx, .xls">
+                            <span class="file-name">선택된 파일 없음</span>
+                            <span class="file-btn">파일 선택</span>
+                        </label>
+                    </div>
                     <button class="upload-corn-btn btn-primary" data-date="${date}" data-batch="${batchNumber}">업로드</button>
                 </div>
             </div>
@@ -461,10 +606,10 @@ async function loadBatchDetails() {
             currentBatchDetailsData = allItems;
 
             const summaryHTML = `
-                <div class="card" style="margin-top: 1.5rem;">
-                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-                        <span>${batchNumber}차수 현황 (상태: ${batchStatus}) | 총 주문 <strong>${orderCount}</strong>건, 총 지시 <strong>${totalQuantity}</strong>개, 총 완료 <strong>${totalPicked}</strong>개</span>
-                        ${batchId ? `<button class="delete-batch-btn btn-icon-danger" data-id="${batchId}" title="이 차수를 삭제합니다"><i class="material-icons">delete_outline</i></button>` : ''}
+                <div class="card" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; background-color:#fff;">
+                        <span style="font-size: 1.1rem;">${batchNumber}차수 현황 (상태: <span style="color:var(--primary-color); font-weight:bold;">${batchStatus}</span>) | 총 주문 <strong>${orderCount}</strong>건, 총 지시 <strong>${totalQuantity}</strong>개, 총 완료 <strong>${totalPicked}</strong>개</span>
+                        ${batchId ? `<button class="delete-batch-btn" data-id="${batchId}" title="이 차수를 삭제합니다" style="background: none; border: none; color: #ef4444; font-weight: 600; font-size: 0.95rem; font-style: italic; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0.5rem;"><span class="material-symbols-outlined" style="font-size: 1.25rem;">delete_outline</span></button>` : ''}
                     </div>
                 </div>`;
             summarySection.innerHTML = summaryHTML;
@@ -474,7 +619,16 @@ async function loadBatchDetails() {
                  tableHTML = `
                     <table>
                         <thead>
-                            <tr><th>출고일</th><th>수취인</th><th>출고지 주소</th><th>출고지시번호</th><th>상품명</th><th>상품코드 (바코드)</th><th>지시수량</th><th>완료수량</th></tr>
+                            <tr>
+                                <th style="min-width: 140px; white-space: nowrap;">출고일</th>
+                                <th style="min-width: 140px;">수취인</th>
+                                <th style="width: 30%; min-width: 250px;">출고지 주소</th>
+                                <th style="min-width: 140px;">출고지시번호</th>
+                                <th style="width: auto; min-width: 180px;">상품명</th>
+                                <th style="min-width: 150px;">상품코드 (바코드)</th>
+                                <th style="min-width: 80px;">지시수량</th>
+                                <th style="min-width: 80px;">완료수량</th>
+                            </tr>
                         </thead>
                         <tbody>
                             ${allItems.map(item => `
@@ -491,16 +645,16 @@ async function loadBatchDetails() {
                         </tbody>
                     </table>`;
             } else {
-                 tableHTML = `<div class="card-body"><p style="text-align:center;">업로드된 주문 상세 내역이 없습니다.</p></div>`;
+                 tableHTML = `<div class="card-body"><p style="text-align:center; color:#64748b; padding:2rem;">업로드된 주문 상세 내역이 없습니다.</p></div>`;
             }
             detailsSection.innerHTML = tableHTML;
 
         } catch (error) {
-            detailsSection.innerHTML = `<div class="card-body"><p style="color:red;">데이터를 불러오는 중 오류가 발생했습니다: ${error.message}</p></div>`;
+            detailsSection.innerHTML = `<div class="card-body"><p style="color:red; text-align:center; padding:2rem;">데이터를 불러오는 중 오류가 발생했습니다: ${error.message}</p></div>`;
             summarySection.innerHTML = '';
         }
     } else {
-        detailsSection.innerHTML = `<div class="card-body"><p style="text-align:center;">데이터가 없습니다. 엑셀 파일을 업로드하세요.</p></div>`;
+        detailsSection.innerHTML = `<div class="card-body"><p style="text-align:center; color:#64748b; padding:2rem;">데이터가 없습니다. 양식 파일을 업로드하세요.</p></div>`;
         summarySection.innerHTML = '';
     }
 }
@@ -679,12 +833,77 @@ async function handleDeleteBatch(batchId) {
 }
 
 // =================================================================
-// 출고 현황 (조회 전용)
+// 🚀 당일 출고 현황 요약 
+// =================================================================
+async function loadTodaySummary() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    const pendingEl = document.getElementById('summary-pending-count');
+    const progressEl = document.getElementById('summary-progress-count');
+    const completedEl = document.getElementById('summary-completed-count');
+
+    if (!pendingEl || !progressEl || !completedEl) return;
+
+    pendingEl.textContent = '...';
+    progressEl.textContent = '...';
+    completedEl.textContent = '...';
+
+    try {
+        const { data: batches, error: batchError } = await supabaseClient
+            .from('picking_batches')
+            .select('id')
+            .eq('channel_id', currentChannelId)
+            .eq('batch_date', todayStr);
+
+        if (batchError) throw batchError;
+
+        if (!batches || batches.length === 0) {
+            pendingEl.textContent = '0건';
+            progressEl.textContent = '0건';
+            completedEl.textContent = '0건';
+            return;
+        }
+
+        const batchIds = batches.map(b => b.id);
+
+        const { data: orders, error: orderError } = await supabaseClient
+            .from('picking_orders')
+            .select('status')
+            .in('batch_id', batchIds);
+
+        if (orderError) throw orderError;
+
+        let pending = 0;
+        let progress = 0;
+        let completed = 0;
+
+        orders.forEach(order => {
+            const status = order.status || '미검수'; 
+            if (status === '완료') {
+                completed++;
+            } else if (status === '검수중') {
+                progress++;
+            } else {
+                pending++;
+            }
+        });
+
+        pendingEl.textContent = `${pending}건`;
+        progressEl.textContent = `${progress}건`;
+        completedEl.textContent = `${completed}건`;
+
+    } catch (error) {
+        console.error('요약 데이터 로드 실패:', error);
+        pendingEl.textContent = '-건';
+        progressEl.textContent = '-건';
+        completedEl.textContent = '-건';
+    }
+}
+
+// =================================================================
+// 출고 현황 조회 (필터 상태 유지)
 // =================================================================
 async function showPickingStatus() {
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
     
     // Grid 레이아웃을 main content-area에 적용
     contentArea.style.display = 'grid';
@@ -697,43 +916,80 @@ async function showPickingStatus() {
             <div class="page-header">
                 <h2>출고 현황 조회</h2>
                 <div class="actions-group">
-                    <button id="refresh-picking-status-btn" class="btn-secondary">새로고침</button>
+                    <button id="refresh-picking-status-btn" class="btn-secondary">초기화 및 새로고침</button>
                     <button id="download-picking-status-btn" class="btn-primary">엑셀 다운로드</button>
                 </div>
             </div>
-            <div class="card">
-                <div class="card-body" style="flex-direction: column; align-items: stretch; gap: 1rem;">
-                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                        <label>날짜 범위:</label>
-                        <input type="date" id="status-start-date-picker" value="${firstDay}">
-                        <span>~</span>
-                        <input type="date" id="status-end-date-picker" value="${lastDay}">
-                        <button id="today-btn" class="btn-secondary" style="margin-left: 0.5rem; background-color: #6c757d;">금일</button>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem;">
+                <div style="background-color: white; padding: 1.25rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 3rem; height: 3rem; background-color: #f0f4ff; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #5A73E4;">
+                        <span class="material-symbols-outlined" style="font-size: 28px;">assignment</span>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                        <label>필터:</label>
-                        <input type="text" id="order-number-filter" placeholder="출고지시번호 검색" class="filter-input" style="width: 200px;">
-                        <input type="text" id="recipient-filter" placeholder="수취인 검색" class="filter-input" style="width: 200px;">
-                        <button id="query-picking-status-btn" class="btn-primary" style="margin-left: 1rem;">조회</button>
+                    <div>
+                        <p style="font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 0.125rem; letter-spacing: 0.025em;">대기 중인 출고</p>
+                        <h2 id="summary-pending-count" style="font-size: 1.5rem; font-weight: 700; color: #1e293b; line-height: 1; margin: 0;">0건</h2>
+                    </div>
+                </div>
+                <div style="background-color: white; padding: 1.25rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 3rem; height: 3rem; background-color: #fff8e6; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #f59e0b;">
+                        <span class="material-symbols-outlined" style="font-size: 28px;">local_shipping</span>
+                    </div>
+                    <div>
+                        <p style="font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 0.125rem; letter-spacing: 0.025em;">진행 중인 출고</p>
+                        <h2 id="summary-progress-count" style="font-size: 1.5rem; font-weight: 700; color: #1e293b; line-height: 1; margin: 0;">0건</h2>
+                    </div>
+                </div>
+                <div style="background-color: white; padding: 1.25rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 3rem; height: 3rem; background-color: #ecfdf5; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #10b981;">
+                        <span class="material-symbols-outlined" style="font-size: 28px;">check_circle</span>
+                    </div>
+                    <div>
+                        <p style="font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 0.125rem; letter-spacing: 0.025em;">오늘 완료</p>
+                        <h2 id="summary-completed-count" style="font-size: 1.5rem; font-weight: 700; color: #1e293b; line-height: 1; margin: 0;">0건</h2>
                     </div>
                 </div>
             </div>
+
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-body" style="display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 1.5rem; justify-content: space-between;">
+                    
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <label style="font-weight: 600; font-size: 0.85rem; color: #64748b; white-space: nowrap;">날짜 범위:</label>
+                            <input type="date" id="status-start-date-picker" value="${currentPickingFilters.startDate}">
+                            <span style="color: #94a3b8; font-weight: bold;">~</span>
+                            <input type="date" id="status-end-date-picker" value="${currentPickingFilters.endDate}">
+                            <button id="today-btn" class="btn-secondary" style="margin-left: 0.25rem; font-size: 0.8rem; padding: 0.4rem 0.8rem; white-space: nowrap;">금일 세팅</button>
+                        </div>
+                        
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <label style="font-weight: 600; font-size: 0.85rem; color: #64748b; white-space: nowrap;">필터 검색:</label>
+                            <input type="text" id="order-number-filter" placeholder="출고지시번호 검색" class="filter-input" style="width: 180px;" value="${currentPickingFilters.orderNumber}">
+                            <input type="text" id="recipient-filter" placeholder="수취인 검색" class="filter-input" style="width: 180px;" value="${currentPickingFilters.recipient}">
+                        </div>
+                    </div>
+                    
+                    <button id="query-picking-status-btn" class="btn-primary" style="margin-left: auto; white-space: nowrap;">조회하기</button>
+                </div>
+            </div>
         </div>
-        <div class="table-scroll-container" style="overflow-y: auto;">
-             <div class="card" id="picking-status-table-card">
-                <div class="card-header">출고 진행 현황</div>
-                <div class="table-wrapper">
-                    <table id="picking-status-table">
+        
+        <div class="table-scroll-container" style="overflow-y: auto; margin-top: 1rem;">
+             <h3 style="font-size: 1.1rem; font-weight: bold; color: #1e293b; margin-bottom: 0.8rem;">출고 진행 현황</h3>
+             <div id="picking-status-table-card" style="background: white; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); overflow: hidden;">
+                <div class="table-wrapper" style="border: none;">
+                    <table id="picking-status-table" style="width: 100%; text-align: center;">
                         <thead>
                             <tr>
-                                <th>출고일자</th>
-                                <th>차수</th>
-                                <th>출고지시번호</th>
-                                <th>출고지 주소</th>
-                                <th>수취인</th>
-                                <th>지시수량</th>
-                                <th>완료수량</th>
-                                <th>상태</th>
+                                <th style="text-align: center;">출고일자</th>
+                                <th style="text-align: center;">차수</th>
+                                <th style="text-align: center;">출고지시번호</th>
+                                <th style="text-align: center;">출고지 주소</th>
+                                <th style="text-align: center;">수취인</th>
+                                <th style="text-align: center;">지시수량</th>
+                                <th style="text-align: center;">완료수량</th>
+                                <th style="text-align: center;">상태</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -748,8 +1004,17 @@ async function showPickingStatus() {
     
     document.getElementById('today-btn').addEventListener('click', () => {
         const todayStr = new Date().toISOString().split('T')[0];
-        document.getElementById('status-start-date-picker').value = todayStr;
-        document.getElementById('status-end-date-picker').value = todayStr;
+        
+        const startPicker = document.getElementById('status-start-date-picker');
+        const endPicker = document.getElementById('status-end-date-picker');
+        
+        if (startPicker._flatpickr) startPicker._flatpickr.setDate(todayStr);
+        else startPicker.value = todayStr;
+        
+        if (endPicker._flatpickr) endPicker._flatpickr.setDate(todayStr);
+        else endPicker.value = todayStr;
+        
+        loadPickingStatusByDateRange(); // 클릭시 즉시 조회되도록 연결
     });
 
     contentArea.querySelectorAll('.filter-input').forEach(input => {
@@ -760,15 +1025,24 @@ async function showPickingStatus() {
         });
     });
     
+    // 렌더링 직후 데이터 로드 실행
+    await loadTodaySummary();
     await loadPickingStatusByDateRange();
+    applyModernCalendar(); // 모던 달력 적용
 }
 
 async function loadPickingStatusByDateRange() {
     const tbody = contentArea.querySelector('#picking-status-table tbody');
     if (!tbody) return;
 
-    const startDate = contentArea.querySelector('#status-start-date-picker').value;
-    const endDate = contentArea.querySelector('#status-end-date-picker').value;
+    // 현재 검색조건 값을 필터 유지 객체에 저장
+    currentPickingFilters.startDate = contentArea.querySelector('#status-start-date-picker').value;
+    currentPickingFilters.endDate = contentArea.querySelector('#status-end-date-picker').value;
+    currentPickingFilters.orderNumber = contentArea.querySelector('#order-number-filter').value;
+    currentPickingFilters.recipient = contentArea.querySelector('#recipient-filter').value;
+
+    const startDate = currentPickingFilters.startDate;
+    const endDate = currentPickingFilters.endDate;
 
     if (!startDate || !endDate) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">날짜 범위를 올바르게 선택해주세요.</td></tr>`;
@@ -815,8 +1089,8 @@ async function loadPickingStatusByDateRange() {
             "상태": order.status
         }));
 
-        const orderFilter = document.getElementById('order-number-filter').value.trim().toLowerCase();
-        const recipientFilter = document.getElementById('recipient-filter').value.trim().toLowerCase();
+        const orderFilter = currentPickingFilters.orderNumber.trim().toLowerCase();
+        const recipientFilter = currentPickingFilters.recipient.trim().toLowerCase();
 
         let filteredData = allDataInPeriod;
         if (orderFilter) {
@@ -844,32 +1118,25 @@ async function loadPickingStatusByDateRange() {
                     <td style="text-align: center;">${order.수취인 || ''}</td>
                     <td style="text-align: center;">${order.지시수량}</td>
                     <td style="text-align: center;">${order.완료수량}</td>
-                    <td style="text-align: center;">${order.상태}</td>
+                    <td style="text-align: center;">
+                        <span class="user-status ${order.상태 === '완료' ? 'status-approved' : 'status-pending'}">
+                            ${order.상태}
+                        </span>
+                    </td>
                 </tr>`
             ).join('');
         }
         
-        const cardHeader = contentArea.querySelector('#picking-status-table-card .card-header');
-        const tableWrapper = contentArea.querySelector('#picking-status-table-card .table-wrapper');
+        const tableWrapper = contentArea.querySelector('#picking-status-table-card');
         const tableHeaders = contentArea.querySelectorAll('#picking-status-table thead th');
         
-        if (cardHeader && tableWrapper && tableHeaders.length > 0) {
-            tableWrapper.style.overflow = 'visible';
-
-            cardHeader.style.position = 'sticky';
-            cardHeader.style.top = '0';
-            cardHeader.style.zIndex = '2';
-            cardHeader.style.backgroundColor = 'var(--card-bg-color, white)';
-            
-            setTimeout(() => {
-                const cardHeaderHeight = cardHeader.offsetHeight;
-                tableHeaders.forEach(th => {
-                    th.style.position = 'sticky';
-                    th.style.top = `${cardHeaderHeight}px`;
-                    th.style.zIndex = '1';
-                    th.style.backgroundColor = '#f8f9fa';
-                });
-            }, 0);
+        if (tableWrapper && tableHeaders.length > 0) {
+            tableHeaders.forEach(th => {
+                th.style.position = 'sticky';
+                th.style.top = '0'; 
+                th.style.zIndex = '1';
+                th.style.backgroundColor = '#f8f9fa';
+            });
         }
 
     } catch (err) {
@@ -880,47 +1147,62 @@ async function loadPickingStatusByDateRange() {
 
 
 // =================================================================
-// 상품 마스터 관리
+// [수정1] 상품 마스터 관리 (가운데 정렬 반영 및 1400px 최대 너비 지정)
 // =================================================================
 async function showProductMaster() {
     contentArea.innerHTML = `
-    <div id="products-section" class="content-section active">
+    <div id="products-section" class="content-section active" style="max-width: 1400px; margin: 0 auto; width: 100%;">
         <div class="sticky-controls">
             <div class="page-header">
                 <h2>상품 마스터 관리</h2>
                 <div class="actions-group">
-                    <button id="refresh-product-master-btn" class="btn-secondary">새로고침</button>
+                    <button id="refresh-product-master-btn" class="btn-secondary">초기화 및 새로고침</button>
                     <button id="download-product-master-btn" class="btn-primary">엑셀 다운로드</button>
                 </div>
             </div>
-            <div class="control-grid">
-                <div class="card">
-                    <div class="card-header">필터 및 검색</div>
-                    <div class="card-body">
-                        <input type="text" id="filter-prod-code" class="filter-input" placeholder="상품코드 검색..." value="${currentFilters.product_code || ''}">
-                        <input type="text" id="filter-prod-barcode" class="filter-input" placeholder="바코드 검색..." value="${currentFilters.barcode || ''}">
-                        <input type="text" id="filter-prod-name" class="filter-input" placeholder="상품명 검색..." value="${currentFilters.product_name || ''}">
-                        <button class="search-button btn-primary">검색</button>
-                        <button class="reset-button btn-secondary">초기화</button>
+            
+            <div class="card" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                <div class="card-body" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <label style="font-weight: 600; font-size: 0.85rem; color: #64748b; white-space: nowrap;">필터 검색:</label>
+                        <input type="text" id="filter-prod-code" class="filter-input" placeholder="상품코드 검색" value="${currentFilters.product_code || ''}" style="width: 150px;">
+                        <input type="text" id="filter-prod-barcode" class="filter-input" placeholder="바코드 검색" value="${currentFilters.barcode || ''}" style="width: 150px;">
+                        <input type="text" id="filter-prod-name" class="filter-input" placeholder="상품명 검색" value="${currentFilters.product_name || ''}" style="width: 150px;">
                     </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">데이터 관리 (표준 양식)</div>
-                    <div class="card-body">
-                        <button class="download-template btn-secondary">양식 다운로드</button>
-                        <input type="file" id="upload-file" class="upload-file" accept=".xlsx, .xls">
-                        <button class="upload-data btn-primary">업로드 추가</button>
-                        <button class="delete-selected btn-danger">선택 삭제</button>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">CORN 양식 업로드 (추가/수정)</div>
-                    <div class="card-body">
-                        <input type="file" id="upload-corn-file" class="upload-file" accept=".xlsx, .xls">
-                        <button id="upload-corn-button" class="btn-primary">업로드 실행</button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="reset-button btn-secondary" style="white-space: nowrap;">초기화</button>
+                        <button class="search-button btn-primary" style="white-space: nowrap;">조회하기</button>
                     </div>
                 </div>
             </div>
+            
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-body" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;">
+                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <label style="font-weight: 600; font-size: 0.85rem; color: #64748b; white-space: nowrap;">데이터 업로드:</label>
+                        <button class="download-template btn-secondary" style="white-space: nowrap;">양식 다운로드</button>
+                        <div class="custom-file-input" style="width: 190px;">
+                            <label>
+                                <input type="file" id="upload-file" class="upload-file" accept=".xlsx, .xls">
+                                <span class="file-name">선택된 파일 없음</span>
+                                <span class="file-btn">파일 선택</span>
+                            </label>
+                        </div>
+                        <button class="upload-data btn-primary" style="white-space: nowrap;">표준 업로드</button>
+                        <div style="width: 1px; height: 20px; background-color: #cbd5e1; margin: 0 0.25rem;"></div>
+                        <div class="custom-file-input" style="width: 190px;">
+                            <label>
+                                <input type="file" id="upload-corn-file" class="upload-file" accept=".xlsx, .xls">
+                                <span class="file-name">선택된 파일 없음</span>
+                                <span class="file-btn">파일 선택</span>
+                            </label>
+                        </div>
+                        <button id="upload-corn-button" class="btn-primary" style="white-space: nowrap;">CORN 업로드</button>
+                    </div>
+                    <button class="delete-selected btn-danger" style="white-space: nowrap;">선택 항목 삭제</button>
+                </div>
+            </div>
+            
         </div>
         <div class="table-wrapper" style="flex-grow: 1;">
             <div class="table-container"></div>
@@ -942,6 +1224,12 @@ async function showProductMaster() {
 async function renderProductTable() {
     const tableContainer = contentArea.querySelector('.table-container');
     if (!tableContainer) return;
+
+    // 필터 값 업데이트 (상태 유지용)
+    currentFilters.product_code = contentArea.querySelector('#filter-prod-code') ? contentArea.querySelector('#filter-prod-code').value.trim() : currentFilters.product_code;
+    currentFilters.barcode = contentArea.querySelector('#filter-prod-barcode') ? contentArea.querySelector('#filter-prod-barcode').value.trim() : currentFilters.barcode;
+    currentFilters.product_name = contentArea.querySelector('#filter-prod-name') ? contentArea.querySelector('#filter-prod-name').value.trim() : currentFilters.product_name;
+
     tableContainer.innerHTML = '불러오는 중...';
     let query = supabaseClient.from('products').select('*').eq('channel_id', currentChannelId);
     if (currentFilters.product_code) query = query.ilike('product_code', `%${currentFilters.product_code}%`);
@@ -956,8 +1244,8 @@ async function renderProductTable() {
     if (data.length === 0) {
         tableContainer.innerHTML = `<p style="text-align:center; padding: 2rem;">표시할 데이터가 없습니다.</p>`;
     } else {
-        let tableHTML = `<table><thead><tr><th><input type="checkbox" class="select-all-checkbox"></th><th>No.</th><th class="sortable" data-column="product_code">상품코드</th><th class="sortable" data-column="barcode">바코드</th><th class="sortable" data-column="product_name">상품명</th></tr></thead><tbody>`;
-        data.forEach((p, index) => { tableHTML += `<tr><td><input type="checkbox" class="row-checkbox" data-id="${p.id}"></td><td>${index + 1}</td><td>${p.product_code || ''}</td><td>${p.barcode}</td><td>${p.product_name}</td></tr>`; });
+        let tableHTML = `<table style="width: 100%; text-align: center;"><thead><tr><th style="text-align: center;"><input type="checkbox" class="select-all-checkbox"></th><th style="text-align: center;">No.</th><th class="sortable" data-column="product_code" style="text-align: center;">상품코드</th><th class="sortable" data-column="barcode" style="text-align: center;">바코드</th><th class="sortable" data-column="product_name" style="text-align: center;">상품명</th></tr></thead><tbody>`;
+        data.forEach((p, index) => { tableHTML += `<tr><td style="text-align: center;"><input type="checkbox" class="row-checkbox" data-id="${p.id}"></td><td style="text-align: center;">${index + 1}</td><td style="text-align: center;">${p.product_code || ''}</td><td style="text-align: center;">${p.barcode}</td><td style="text-align: center;">${p.product_name}</td></tr>`; });
         tableHTML += '</tbody></table>';
         tableContainer.innerHTML = tableHTML;
     }
@@ -1002,6 +1290,13 @@ async function handleCornUpload() {
             alert('CORN 양식 업로드 실패: ' + error.message);
         } finally {
             fileInput.value = '';
+            // 파일 초기화 시 UI 텍스트도 원상복구
+            const fileNameSpan = fileInput.closest('label').querySelector('.file-name');
+            if(fileNameSpan) {
+                fileNameSpan.textContent = '선택된 파일 없음';
+                fileNameSpan.style.color = 'var(--text-secondary-color)';
+                fileNameSpan.style.fontWeight = 'normal';
+            }
         }
     };
     reader.readAsArrayBuffer(fileInput.files[0]);
@@ -1022,7 +1317,16 @@ async function handleProductUpload() {
             if (error) throw error;
             alert('상품 마스터 업로드(추가/수정) 성공!');
             renderProductTable();
-        } catch (error) { alert('업로드 실패: ' + error.message); } finally { fileInput.value = ''; }
+        } catch (error) { alert('업로드 실패: ' + error.message); } finally { 
+            fileInput.value = ''; 
+            // 파일 초기화 시 UI 텍스트도 원상복구
+            const fileNameSpan = fileInput.closest('label').querySelector('.file-name');
+            if(fileNameSpan) {
+                fileNameSpan.textContent = '선택된 파일 없음';
+                fileNameSpan.style.color = 'var(--text-secondary-color)';
+                fileNameSpan.style.fontWeight = 'normal';
+            }
+        }
     };
     reader.readAsArrayBuffer(fileInput.files[0]);
 }
@@ -1060,15 +1364,18 @@ async function fetchAllWithPagination(query, pageSize = 1000) {
 
 async function showUserManagement() {
     contentArea.innerHTML = `
-        <div class="content-section">
-            <div class="page-header">
+        <div class="content-section" style="max-width: 900px; margin: 0 auto; width: 100%; padding-top: 1rem;">
+            <div class="page-header" style="margin-bottom: 2rem;">
                 <h2>사용자 관리</h2>
                 <div class="actions-group">
                     <button id="refresh-users-btn" class="btn-secondary">새로고침</button>
                 </div>
             </div>
             <div class="card">
-                <div class="card-header">사용자 목록</div>
+                <div class="card-header" style="background-color: #f8fafd; display: flex; justify-content: space-between;">
+                    <span>가입된 사용자 목록</span>
+                    <span style="font-size: 0.8rem; font-weight: normal; color: #64748b;">승인 대기 중인 사용자를 승인하여 권한을 부여하세요.</span>
+                </div>
                 <ul id="user-list" class="management-list"></ul>
             </div>
         </div>`;
@@ -1080,7 +1387,7 @@ async function loadUsers() {
     list.innerHTML = `<li>불러오는 중...</li>`;
     const { data, error } = await supabaseClient.rpc('list_all_users');
     if (error) { list.innerHTML = `<li>사용자 목록 로딩 오류: ${error.message}</li>`; return; }
-    if (!data || data.length === 0) { list.innerHTML = `<li>가입한 사용자가 없습니다.</li>`; return; }
+    if (!data || data.length === 0) { list.innerHTML = `<li style="padding:2rem; text-align:center; color:#64748b;">가입한 사용자가 없습니다.</li>`; return; }
 
     list.innerHTML = data.map(user => {
         const isAdmin = user.user_metadata && user.user_metadata.is_admin === true;
@@ -1093,12 +1400,12 @@ async function loadUsers() {
         
         let actionButton = '';
         if (!isAdmin && !isSuperAdmin) {
-            actionButton = `<button class="btn-approve approve-user-button" data-id="${user.id}">승인</button>`;
+            actionButton = `<button class="btn-approve approve-user-button" data-id="${user.id}">승인하기</button>`;
         }
 
-        return `<li class="management-list-item">
-                    <span>${user.email}</span>
-                    <div>
+        return `<li class="management-list-item" style="padding: 1.2rem 1.5rem;">
+                    <span style="font-weight: 500;">${user.email}</span>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <span class="user-status ${statusClass}">${statusText}</span>
                         ${actionButton}
                     </div>
