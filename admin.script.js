@@ -1497,4 +1497,41 @@ async function loadUsers() {
         const statusClass = isApproved ? 'status-approved' : 'status-pending';
         const statusText = isApproved ? '승인 완료' : '승인 대기';
         
-        let action
+        let actionButton = '';
+        if (!isAdmin && !isSuperAdmin) {
+            actionButton = `<button class="btn-approve approve-user-button" data-id="${user.id}">승인하기</button>`;
+        }
+
+        return `<li class="management-list-item" style="padding: 1.2rem 1.5rem;">
+                    <span style="font-weight: 500;">${user.email}</span>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="user-status ${statusClass}">${statusText}</span>
+                        ${actionButton}
+                    </div>
+                </li>`;
+    }).join('');
+}
+
+
+async function handleApproveUser(e) {
+    const userId = e.target.dataset.id;
+    if (confirm('이 사용자를 승인하고 관리자 권한을 부여하시겠습니까?')) {
+        const { data, error } = await supabaseClient.rpc('approve_and_grant_admin', {
+            user_id_to_approve: userId
+        });
+
+        if (error) {
+            alert('승인 실패: ' + error.message);
+        } else {
+            alert(data || '사용자가 승인되었습니다.');
+            showUserManagement();
+        }
+    }
+}
+
+logoutButton.addEventListener('click', async () => {
+    if (confirm('로그아웃하시겠습니까?')) {
+        await supabaseClient.auth.signOut();
+        window.location.href = 'login.html';
+    }
+});
