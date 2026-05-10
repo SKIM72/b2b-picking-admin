@@ -355,6 +355,17 @@ async function showBatchSummaryModal(date) {
         data.forEach(batch => {
             const progress = (batch.order_count > 0) ? (batch.completed_count / batch.order_count * 100) : 0;
 
+            // ▼▼▼ [수정] 주문 건수와 완료 건수를 비교하여 상태 동적 계산 ▼▼▼
+            let displayStatus = batch.status || '대기';
+            if (batch.order_count > 0) {
+                if (batch.completed_count >= batch.order_count) {
+                    displayStatus = '완료';
+                } else if (batch.completed_count > 0) {
+                    displayStatus = '진행중';
+                }
+            }
+            // ▲▲▲ [수정] 끝 ▲▲▲
+
             let progressHtml;
             if (progress > 0) {
                 progressHtml = `
@@ -370,7 +381,7 @@ async function showBatchSummaryModal(date) {
             tableHtml += `
                 <tr data-batch-number="${batch.batch_number}">
                     <td style="text-align: center; font-weight: 700;">${batch.batch_number}차</td>
-                    <td style="text-align: center;">${batch.status || '대기'}</td>
+                    <td style="text-align: center;">${displayStatus}</td>
                     <td style="text-align: center;">${batch.order_count}</td>
                     <td style="text-align: center;">${batch.completed_count}</td>
                     <td style="text-align: center;">${progressHtml}</td>
@@ -605,10 +616,21 @@ async function loadBatchDetails() {
 
             currentBatchDetailsData = allItems;
 
+            // ▼▼▼ [수정] 지시수량과 완료수량을 비교하여 상태 동적 표시 ▼▼▼
+            let displayStatus = batchStatus;
+            if (totalQuantity > 0) {
+                if (totalPicked >= totalQuantity) {
+                    displayStatus = '완료';
+                } else if (totalPicked > 0) {
+                    displayStatus = '진행중';
+                }
+            }
+            // ▲▲▲ [수정] 끝 ▲▲▲
+
             const summaryHTML = `
                 <div class="card" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
                     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; background-color:#fff;">
-                        <span style="font-size: 1.1rem;">${batchNumber}차수 현황 (상태: <span style="color:var(--primary-color); font-weight:bold;">${batchStatus}</span>) | 총 주문 <strong>${orderCount}</strong>건, 총 지시 <strong>${totalQuantity}</strong>개, 총 완료 <strong>${totalPicked}</strong>개</span>
+                        <span style="font-size: 1.1rem;">${batchNumber}차수 현황 (상태: <span style="color:var(--primary-color); font-weight:bold;">${displayStatus}</span>) | 총 주문 <strong>${orderCount}</strong>건, 총 지시 <strong>${totalQuantity}</strong>개, 총 완료 <strong>${totalPicked}</strong>개</span>
                         ${batchId ? `<button class="delete-batch-btn" data-id="${batchId}" title="이 차수를 삭제합니다" style="background: none; border: none; color: #ef4444; font-weight: 600; font-size: 0.95rem; font-style: italic; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 0.5rem;"><span class="material-symbols-outlined" style="font-size: 1.25rem;">delete_outline</span></button>` : ''}
                     </div>
                 </div>`;
