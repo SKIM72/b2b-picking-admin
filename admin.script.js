@@ -31,6 +31,72 @@ let currentBatchFilters = {
     batchNumber: ''
 };
 
+// ▼▼▼ [추가] 엑셀 다운로드 파일명 및 스타일 처리를 위한 헬퍼 함수 ▼▼▼
+function getFormattedDateStr() {
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${yy}${mm}${dd}_${hh}${min}${ss}`;
+}
+
+function applyExcelStyle(worksheet) {
+    if (!worksheet['!ref']) return;
+    const range = XLSX.utils.decode_range(worksheet['!ref']);
+    const colWidths = [];
+
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        let maxWidth = 10; // 기본 최소 너비
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            const cellAddress = { c: C, r: R };
+            const cellRef = XLSX.utils.encode_cell(cellAddress);
+            const cell = worksheet[cellRef];
+            
+            if (!cell) continue;
+
+            // 셀 너비 계산 (한글/다바이트 문자는 넓게 계산)
+            let cellText = cell.v ? String(cell.v) : "";
+            let textLength = 0;
+            for (let i = 0; i < cellText.length; i++) {
+                textLength += (cellText.charCodeAt(i) > 255) ? 2.2 : 1.2;
+            }
+            if (textLength > maxWidth) maxWidth = textLength;
+
+            // 스타일 적용 (xlsx-js-style 지원)
+            if (R === 0) { // 헤더 행
+                cell.s = {
+                    fill: { fgColor: { rgb: "5A73E4" } }, // 테마의 기본 Primary 파란색
+                    font: { color: { rgb: "FFFFFF" }, bold: true },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "CBD5E1" } },
+                        bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+                        left: { style: "thin", color: { rgb: "CBD5E1" } },
+                        right: { style: "thin", color: { rgb: "CBD5E1" } }
+                    }
+                };
+            } else { // 데이터 행
+                cell.s = {
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "E2E8F0" } },
+                        bottom: { style: "thin", color: { rgb: "E2E8F0" } },
+                        left: { style: "thin", color: { rgb: "E2E8F0" } },
+                        right: { style: "thin", color: { rgb: "E2E8F0" } }
+                    }
+                };
+            }
+        }
+        colWidths[C] = { wch: Math.min(Math.ceil(maxWidth) + 3, 60) }; // 약간의 여백 추가, 최대 60으로 너비 제한
+    }
+    worksheet['!cols'] = colWidths;
+}
+// ▲▲▲ [추가] 엑셀 다운로드 헬퍼 함수 끝 ▲▲▲
+
+
 // 모던 달력 라이브러리(Flatpickr) 동적 로드 함수
 const loadCalendarLibrary = async () => {
     if (document.getElementById('flatpickr-css')) return;
@@ -209,14 +275,16 @@ contentArea.addEventListener('click', function(e) {
     if (target.id === 'refresh-channels-btn') showChannelManagement();
     if (target.id === 'refresh-users-btn') showUserManagement();
 
+    // ▼▼▼ [수정] 다운로드 파일명 시간 추가 및 스타일 적용 ▼▼▼
     if (target.id === 'download-picking-status-btn') {
         if (!currentPickingStatusData || currentPickingStatusData.length === 0) {
             alert('다운로드할 데이터가 없습니다.'); return;
         }
         const worksheet = XLSX.utils.json_to_sheet(currentPickingStatusData);
+        applyExcelStyle(worksheet);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, '출고현황');
-        XLSX.writeFile(workbook, `출고현황_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(workbook, `출고현황_${getFormattedDateStr()}.xlsx`);
     }
 
     if (target.id === 'download-batch-details-btn') {
@@ -234,9 +302,10 @@ contentArea.addEventListener('click', function(e) {
             '완료수량': item.picked_quantity
         }));
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        applyExcelStyle(worksheet);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, '출고상세');
-        XLSX.writeFile(workbook, `출고상세_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(workbook, `출고상세_${getFormattedDateStr()}.xlsx`);
     }
 
     if (target.id === 'download-product-master-btn') {
@@ -249,10 +318,12 @@ contentArea.addEventListener('click', function(e) {
             '상품명': p.product_name
         }));
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        applyExcelStyle(worksheet);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, '상품마스터');
-        XLSX.writeFile(workbook, `상품마스터_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        XLSX.writeFile(workbook, `상품마스터_${getFormattedDateStr()}.xlsx`);
     }
+    // ▲▲▲ [수정] 다운로드 버튼 반영 끝 ▲▲▲
 
     if (target.id === 'show-batch-summary-btn') {
         const date = contentArea.querySelector('#work-date-picker').value;
@@ -694,13 +765,16 @@ async function handleCreateNewBatch() {
     loadBatchDetails();
 }
 
+// ▼▼▼ [수정] 표준 양식(공양식) 다운로드 시간 추가 및 스타일 적용 ▼▼▼
 async function handleStandardTemplateDownload() {
     const headers = ["order_number", "recipient", "destination_address", "barcode", "product_name", "expected_quantity"];
     const worksheet = XLSX.utils.json_to_sheet([], { header: headers });
+    applyExcelStyle(worksheet);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
-    XLSX.writeFile(workbook, "standard_order_template.xlsx");
+    XLSX.writeFile(workbook, `standard_order_template_${getFormattedDateStr()}.xlsx`);
 }
+// ▲▲▲ [수정] 끝 ▲▲▲
 
 async function handleStandardOrderUpload(target) {
     const fileInput = contentArea.querySelector('.standard-excel-input');
@@ -1353,13 +1427,16 @@ async function handleProductUpload() {
     reader.readAsArrayBuffer(fileInput.files[0]);
 }
 
+// ▼▼▼ [수정] 상품마스터 양식(공양식) 다운로드 시간 추가 및 스타일 적용 ▼▼▼
 function handleProductTemplateDownload() {
     const headers = ["product_code", "barcode", "product_name"];
     const worksheet = XLSX.utils.json_to_sheet([], { header: headers });
+    applyExcelStyle(worksheet);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
-    XLSX.writeFile(workbook, "products_template.xlsx");
+    XLSX.writeFile(workbook, `products_template_${getFormattedDateStr()}.xlsx`);
 }
+// ▲▲▲ [수정] 끝 ▲▲▲
 
 async function handleDeleteSelectedProducts() {
     const checkedBoxes = contentArea.querySelectorAll('.row-checkbox:checked');
@@ -1420,41 +1497,4 @@ async function loadUsers() {
         const statusClass = isApproved ? 'status-approved' : 'status-pending';
         const statusText = isApproved ? '승인 완료' : '승인 대기';
         
-        let actionButton = '';
-        if (!isAdmin && !isSuperAdmin) {
-            actionButton = `<button class="btn-approve approve-user-button" data-id="${user.id}">승인하기</button>`;
-        }
-
-        return `<li class="management-list-item" style="padding: 1.2rem 1.5rem;">
-                    <span style="font-weight: 500;">${user.email}</span>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span class="user-status ${statusClass}">${statusText}</span>
-                        ${actionButton}
-                    </div>
-                </li>`;
-    }).join('');
-}
-
-
-async function handleApproveUser(e) {
-    const userId = e.target.dataset.id;
-    if (confirm('이 사용자를 승인하고 관리자 권한을 부여하시겠습니까?')) {
-        const { data, error } = await supabaseClient.rpc('approve_and_grant_admin', {
-            user_id_to_approve: userId
-        });
-
-        if (error) {
-            alert('승인 실패: ' + error.message);
-        } else {
-            alert(data || '사용자가 승인되었습니다.');
-            showUserManagement();
-        }
-    }
-}
-
-logoutButton.addEventListener('click', async () => {
-    if (confirm('로그아웃하시겠습니까?')) {
-        await supabaseClient.auth.signOut();
-        window.location.href = 'login.html';
-    }
-});
+        let action
